@@ -14,6 +14,15 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1335 USA
 
 ###
+### Number of parallel build jobs: the CMAKE_BUILD_PARALLEL_LEVEL
+### environment variable, all logical cores if not set
+###
+if (NOT DEFINED ENV{CMAKE_BUILD_PARALLEL_LEVEL})
+  cmake_host_system_information(RESULT n QUERY NUMBER_OF_LOGICAL_CORES)
+  set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} ${n})
+endif()
+
+###
 ### Iterate command line, skip up to dir name arguments, build plugins
 ###
 math(EXPR last "${CMAKE_ARGC} - 1")
@@ -28,6 +37,7 @@ foreach(i RANGE 0 ${last})
   elseif (f STREQUAL "-P") # ok, dir name arguments after that
     set(skip FALSE)
     message(STATUS "Build params:${param}")
+    message(STATUS "Parallel jobs: $ENV{CMAKE_BUILD_PARALLEL_LEVEL}")
     continue()
   elseif (skip OR f MATCHES "\\.[^/]*$") # skip files with extensions
     continue()
@@ -40,7 +50,7 @@ foreach(i RANGE 0 ${last})
   execute_process(COMMAND ${CMAKE_COMMAND} -S ${CMAKE_CURRENT_LIST_DIR} -DDIR=${f} -B "${b}" ${param} RESULT_VARIABLE err)
   if (NOT err)
     set(stage build)
-    execute_process(COMMAND ${CMAKE_COMMAND} --build "${b}" --parallel --target package RESULT_VARIABLE err)
+    execute_process(COMMAND ${CMAKE_COMMAND} --build "${b}" --target package RESULT_VARIABLE err)
   endif()
   if (NOT err)
     set(stage package)

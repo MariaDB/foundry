@@ -21,5 +21,9 @@ Building an rpm package for just one plugin:
 ```
 cmake -DRPM=1 -P run.cmake tidesql
 ```
+Limiting the number of parallel build jobs (default: all logical cores):
+```
+CMAKE_BUILD_PARALLEL_LEVEL=4 cmake -P run.cmake tidesql
+```
 
 It's not designed for plugin development, incremental builds and rebuilds — use plugin sources directly for that.
