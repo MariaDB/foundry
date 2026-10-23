@@ -1,0 +1,96 @@
+name: Buildbot
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/buildbot')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      statuses: read
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      - name: Check the commenter has write access
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: |
+          case $(gh api "repos/$REPO/collaborators/$COMMENTER/permission" --jq .permission) in
+            admin | write) ;;
+            *) echo "::error::$COMMENTER has no write access to $REPO"; exit 1 ;;
+          esac
+
+      - name: Find the head commit, unless it was already sent
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          sha=$(gh api "repos/$REPO/pulls/$NUMBER" --jq .head.sha)
+          sent=$(gh api "repos/$REPO/commits/$sha/status" --jq 'any(.statuses[]; .context == "buildbot/requested")')
+          if [ "$sent" = true ]; then
+            echo "::notice::$sha was already sent to Buildbot: use Rebuild there to build it again"
+          else
+            echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          fi
+
+  send:
+    needs: check
+    if: needs.check.outputs.sha != ''
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      statuses: write
+    environment: buildbot
+    steps:
+      - name: Write the pull request event
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          SHA: ${{ needs.check.outputs.sha }}
+        run: |
+          # The event GitHub sends for a push to the pull request, with the
+          # full pull request: Buildbot reads its commit count.
+          gh api "repos/$REPO/pulls/$NUMBER" |
+            jq -c '{action: "synchronize", number, pull_request: ., repository: .base.repo, sender: .user}' >event.json
+          if [ "$(jq -r .pull_request.head.sha event.json)" != "$SHA" ]; then
+            echo "::error::The pull request changed after the check: comment /buildbot again"
+            exit 1
+          fi
+
+      - name: Send it to Buildbot
+        env:
+          BUILDBOT_HOOK_URL: ${{ secrets.BUILDBOT_HOOK_URL }}
+          BUILDBOT_HOOK_SECRET: ${{ secrets.BUILDBOT_HOOK_SECRET }}
+        run: |
+          : "${BUILDBOT_HOOK_URL:?is not set in the buildbot environment}"
+          : "${BUILDBOT_HOOK_SECRET:?is not set in the buildbot environment}"
+          signature=$(python3 -c 'import hashlib, hmac, os, sys; print(hmac.new(os.environb[b"BUILDBOT_HOOK_SECRET"], sys.stdin.buffer.read(), hashlib.sha1).hexdigest())' <event.json)
+          curl --fail-with-body -sS "$BUILDBOT_HOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -H 'X-GitHub-Event: pull_request' \
+            -H "X-Hub-Signature: sha1=$signature" \
+            --data-binary @event.json
+
+      - name: Mark the commit as sent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ needs.check.outputs.sha }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+        run: |
+          gh api --silent "repos/$REPO/statuses/$SHA" -f state=success -f context=buildbot/requested \
+            -f description="Sent to Buildbot by $COMMENTER"
