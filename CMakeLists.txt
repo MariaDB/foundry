@@ -31,6 +31,11 @@ endforeach()
 add_subdirectory(${DIR})
 
 get_property(t DIRECTORY ${DIR} PROPERTY BUILDSYSTEM_TARGETS)
+if (NOT t)
+  file(TOUCH ${CMAKE_CURRENT_BINARY_DIR}/skipped)
+  message(FATAL_ERROR No build targets - plugin is skipped)
+endif()
+
 ExternalProject_Get_Property(${t} BINARY_DIR)
 
 add_custom_target(package
