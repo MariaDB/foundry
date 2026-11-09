@@ -13,7 +13,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1335 USA
 cmake_minimum_required(VERSION 3.12)
-project(Foundry LANGUAGES NONE)
+project(Foundry LANGUAGES C CXX)
 
 include(ExternalProject)
 
@@ -33,7 +33,7 @@ add_subdirectory(${DIR})
 get_property(t DIRECTORY ${DIR} PROPERTY BUILDSYSTEM_TARGETS)
 if (NOT t)
   file(TOUCH ${CMAKE_CURRENT_BINARY_DIR}/skipped)
-  message(FATAL_ERROR No build targets - plugin is skipped)
+  message(FATAL_ERROR "No build targets - plugin is skipped")
 endif()
 
 ExternalProject_Get_Property(${t} BINARY_DIR)
