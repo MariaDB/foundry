@@ -1,3 +1,25 @@
+macro(ret v)
+  message("${v}=${${v}}")
+  return()
+endmacro()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+  ret(CMAKE_CXX_COMPILER_VERSION)
+endif()
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  ret(CMAKE_SYSTEM_NAME)
+endif()
+
+if(NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR
+        CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64"))
+  ret(CMAKE_SYSTEM_PROCESSOR)
+endif()
+
+if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+  ret(CMAKE_SIZEOF_VOID_P)
+endif()
+
 ExternalProject_Add(duckdb
   GIT_REPOSITORY https://github.com/drrtuy/duckdb-engine
   GIT_TAG 9692df5b17f5d0b4e4ae9d9bf93fd29f3771c978
