@@ -22,7 +22,7 @@ endif()
 
 ExternalProject_Add(duckdb
   GIT_REPOSITORY https://github.com/drrtuy/duckdb-engine
-  GIT_TAG 9692df5b17f5d0b4e4ae9d9bf93fd29f3771c978
+  GIT_TAG fdd1b92bd5b76d4de9de8bdd4d52093569869d9a
   INSTALL_COMMAND ""
   CMAKE_ARGS ${CMAKE_ARGS}
 )
